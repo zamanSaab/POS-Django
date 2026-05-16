@@ -32,8 +32,8 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Absolute path to the React production build
-REACT_BUILD_DIR = Path("/home/zaman07/POS-React/dist")
+# Absolute path to the React production build (inside the Django project)
+REACT_BUILD_DIR = BASE_DIR / "frontend"
 
 CORS_ALLOWED_ORIGINS = [
     "https://zaman07.pythonanywhere.com",
