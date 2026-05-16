@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -88,3 +89,17 @@ class NotificationPrefsSerializer(serializers.ModelSerializer):
     class Meta:
         model = NotificationPreferences
         fields = ["order_updates", "promotions", "stock_alerts", "system_messages"]
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_new_password(self, value):
+        validate_password(value)
+        return value
