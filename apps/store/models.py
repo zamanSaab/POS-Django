@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 
 
 STORE_TYPE_CHOICES = [
@@ -38,3 +38,32 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="products/")
+    is_primary = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-is_primary", "order"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product"],
+                condition=models.Q(is_primary=True),
+                name="unique_primary_image_per_product",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.is_primary:
+            with transaction.atomic():
+                ProductImage.objects.filter(product=self.product, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
+
+    def __str__(self):
+        prefix = "[Primary] " if self.is_primary else ""
+        return f"{prefix}{self.product.name} image {self.pk}"

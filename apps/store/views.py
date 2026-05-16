@@ -1,16 +1,18 @@
-from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from config.permissions import IsAdmin
-from .models import Category, Product
-from .serializers import CategorySerializer, ProductListSerializer, ProductSerializer
+from .models import Category, Product, ProductImage
+from .serializers import (
+    CategorySerializer, ProductImageSerializer, ProductImageUploadSerializer,
+    ProductListSerializer, ProductSerializer,
+)
 
 
 class ProductViewSet(ModelViewSet):
-    queryset = Product.objects.select_related("category").all()
+    queryset = Product.objects.select_related("category").prefetch_related("images").all()
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -41,6 +43,34 @@ class ProductViewSet(ModelViewSet):
         product.in_stock = not product.in_stock
         product.save()
         return Response({"id": product.id, "in_stock": product.in_stock})
+
+
+class ProductImageViewSet(ModelViewSet):
+    queryset = ProductImage.objects.select_related("product").all()
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_serializer_class(self):
+        if self.request.method in ["POST", "PATCH"]:
+            return ProductImageUploadSerializer
+        return ProductImageSerializer
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [IsAdmin()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if product_id := self.request.query_params.get("product"):
+            qs = qs.filter(product_id=product_id)
+        return qs
+
+    @action(detail=True, methods=["patch"], url_path="set-primary")
+    def set_primary(self, request, pk=None):
+        image = self.get_object()
+        image.is_primary = True
+        image.save()
+        return Response(ProductImageSerializer(image, context={"request": request}).data)
 
 
 class CategoryViewSet(ModelViewSet):
