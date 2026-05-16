@@ -21,3 +21,5 @@ staticfiles/
 # Claude Code
 .agents
 CLAUDE.md
+AGENTS.md
+.codex
