@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Django
+db.sqlite3
+*.log
+media/
+staticfiles/
+
+# Env
+.env
+.env.local
+
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+
+# Claude Code
+.agents
