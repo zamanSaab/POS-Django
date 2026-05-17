@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView
 
 from config.permissions import IsAdminOrStaff
+from apps.dashboard.config import get_decimal_config
 from apps.store.models import Product
 from apps.orders.models import Order, OrderItem
 from apps.orders.serializers import OrderSerializer
@@ -43,14 +44,14 @@ class POSSaleView(APIView):
         subtotal = sum(products[i["product_id"]].price * i["qty"] for i in items_data)
         discount_pct = Decimal(str(data.get("discount_percent", 0)))
         discount = subtotal * (discount_pct / 100)
-        tax = (subtotal - discount) * Decimal("0.08")
+        tax = (subtotal - discount) * get_decimal_config("TAX_RATE", "0.08")
         total = subtotal - discount + tax
 
         with transaction.atomic():
             order = Order.objects.create(
                 user=None,
                 customer_name=data.get("customer_name") or "Walk-in Customer",
-                email="pos@luxepos.com",
+                email="pos@frj-pos.com",
                 phone="",
                 shipping_address="In-Store",
                 shipping_city="",

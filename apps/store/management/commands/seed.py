@@ -1,6 +1,7 @@
 import random
 from decimal import Decimal
 from django.core.management.base import BaseCommand
+from apps.dashboard.config import get_decimal_config
 from django.utils import timezone
 
 
@@ -99,10 +100,10 @@ class Command(BaseCommand):
 
     def _seed_users(self):
         from apps.accounts.models import User
-        if not User.objects.filter(email="admin@luxepos.com").exists():
+        if not User.objects.filter(email="admin@frj-pos.com").exists():
             User.objects.create_superuser(
-                email="admin@luxepos.com",
-                name="LUXE Admin",
+                email="admin@frj-pos.com",
+                name="FRJ-POS Admin",
                 password="admin123",
             )
             self.stdout.write("  Created admin user")
@@ -181,8 +182,9 @@ class Command(BaseCommand):
             selected = random.sample(products, min(2, len(products)))
             subtotal = sum(p.price * random.randint(1, 3) for p in selected)
             discount = Decimal("0")
-            delivery_fee = Decimal("0") if subtotal >= Decimal("10000") else Decimal("250")
-            tax = subtotal * Decimal("0.08")
+            delivery_fee = Decimal("0") if subtotal >= get_decimal_config("FREE_DELIVERY_THRESHOLD", "10000") \
+                else get_decimal_config("DELIVERY_FEE", "250")
+            tax = subtotal * get_decimal_config("TAX_RATE", "0.08")
             total = subtotal + tax + delivery_fee
 
             order = Order.objects.create(
@@ -235,7 +237,7 @@ class Command(BaseCommand):
             ("promo", "New Arrivals", "Discover our latest jewelry collection — now available in store."),
             ("stock", "Back in Stock", "AuraSound Elite Headphones are back in stock. Grab yours now!"),
             ("system", "Profile Updated", "Your account profile has been updated successfully."),
-            ("system", "Welcome to LUXE POS", "Thank you for joining LUXE POS. Explore our luxury collections."),
+            ("system", "Welcome to FRJ-POS", "Thank you for joining FRJ-POS. Explore our luxury collections."),
             ("order", "Order Processing", "Your order ORD-0003 is being prepared."),
             ("promo", "Members Exclusive", "As a valued member, enjoy early access to our summer collection."),
             ("stock", "Low Stock Alert", "Tourbillon Prestige Watch — only 2 left in stock."),

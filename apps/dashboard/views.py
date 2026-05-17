@@ -2,6 +2,7 @@ import calendar as cal_module
 from datetime import datetime, timezone as dt_timezone
 from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
@@ -11,6 +12,7 @@ from apps.accounts.models import User
 from apps.accounts.serializers import UserSerializer
 from apps.orders.models import Order, OrderItem
 from apps.orders.serializers import OrderSerializer
+from .models import Configuration
 
 
 def pct_change(current, previous):
@@ -147,3 +149,24 @@ class ReportsView(APIView):
             "monthly": list(monthly),
             "by_store_type": list(by_store_type),
         })
+
+
+class ConfigView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            obj.key: obj.value
+            for obj in Configuration.objects.all()
+        })
+
+    def patch(self, request):
+        self.permission_classes = [IsAdmin]
+        self.check_permissions(request)
+        updated = {}
+        for key, value in request.data.items():
+            rows = Configuration.objects.filter(key=key)
+            if rows.exists():
+                rows.update(value=str(value))
+                updated[key] = str(value)
+        return Response(updated)

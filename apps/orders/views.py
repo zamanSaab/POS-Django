@@ -1,14 +1,19 @@
+import logging
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from config.permissions import IsAdmin
+from apps.dashboard.config import get_decimal_config
 from apps.store.models import Product
 from apps.notifications.models import Notification
+from .emails import send_order_confirmation_email
 from .models import Order, OrderItem, OrderTimeline, SavedCart
 from .serializers import OrderCreateSerializer, OrderSerializer, SavedCartSerializer
 
@@ -75,8 +80,9 @@ class OrderCreateView(APIView):
         subtotal = sum(products[i["product_id"]].price * i["qty"] for i in cart_items)
         coupon = data.get("coupon_code", "").strip().upper()
         discount = subtotal * Decimal("0.10") if coupon in VALID_COUPONS else Decimal("0")
-        delivery_fee = Decimal("0") if subtotal >= Decimal("10000") else Decimal("250")
-        tax = (subtotal - discount) * Decimal("0.08")
+        delivery_fee = Decimal("0") if subtotal >= get_decimal_config("FREE_DELIVERY_THRESHOLD", "10000") \
+            else get_decimal_config("DELIVERY_FEE", "250")
+        tax = (subtotal - discount) * get_decimal_config("TAX_RATE", "0.08")
         total = subtotal - discount + tax + delivery_fee
 
         with transaction.atomic():
@@ -120,6 +126,10 @@ class OrderCreateView(APIView):
                     body=f"Your order {order.order_number} has been placed successfully.",
                 )
 
+        try:
+            send_order_confirmation_email(order)
+        except Exception:
+            logger.exception("Failed to send order confirmation email for order_id=%s", order.pk)
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 

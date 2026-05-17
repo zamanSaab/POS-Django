@@ -219,3 +219,37 @@ class CheckoutCollisionRetryTest(TestCase):
             response = client.post(CHECKOUT_URL, VALID_PAYLOAD, format="json")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["order_number"], "ORD-BBBBBBBB")
+
+
+class OrderConfirmationEmailTest(TestCase):
+    def setUp(self):
+        make_product(pid="p1", price="20.00")
+
+    @patch("apps.orders.views.send_order_confirmation_email")
+    def test_checkout_sends_confirmation_email(self, mock_send):
+        client = APIClient()
+        response = client.post(CHECKOUT_URL, VALID_PAYLOAD, format="json")
+        self.assertEqual(response.status_code, 201)
+        mock_send.assert_called_once()
+        order_arg = mock_send.call_args[0][0]
+        self.assertEqual(order_arg.email, VALID_PAYLOAD["email"])
+
+    @patch("apps.orders.views.send_order_confirmation_email", side_effect=Exception("SMTP down"))
+    def test_email_failure_does_not_block_checkout(self, _):
+        client = APIClient()
+        response = client.post(CHECKOUT_URL, VALID_PAYLOAD, format="json")
+        self.assertEqual(response.status_code, 201)
+
+    @patch("apps.orders.emails.send_mail")
+    def test_pos_email_is_skipped(self, mock_send_mail):
+        from apps.orders.emails import send_order_confirmation_email
+        from apps.orders.models import Order
+
+        order = Order(
+            customer_name="POS Customer",
+            email="pos@frj-pos.com",
+            order_number="ORD-POSTEST",
+            total="100.00",
+        )
+        send_order_confirmation_email(order)
+        mock_send_mail.assert_not_called()

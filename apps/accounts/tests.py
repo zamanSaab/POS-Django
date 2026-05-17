@@ -136,3 +136,27 @@ class PasswordResetTest(TestCase):
         )
 
         self.assertEqual(response.status_code, 429)
+
+
+class WelcomeEmailTest(TestCase):
+    REGISTER_PAYLOAD = {
+        "name": "New User",
+        "email": "new@example.com",
+        "password": "secret123",
+        "phone": "+92 300 0000000",
+    }
+
+    @patch("apps.accounts.views.send_welcome_email")
+    def test_registration_triggers_welcome_email(self, mock_send):
+        client = APIClient()
+        response = client.post("/api/auth/register/", self.REGISTER_PAYLOAD, format="json")
+        self.assertEqual(response.status_code, 201)
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args[0][0].email, self.REGISTER_PAYLOAD["email"])
+
+    @patch("apps.accounts.views.send_welcome_email", side_effect=Exception("SMTP down"))
+    def test_email_failure_does_not_block_registration(self, _):
+        client = APIClient()
+        response = client.post("/api/auth/register/", self.REGISTER_PAYLOAD, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(email=self.REGISTER_PAYLOAD["email"]).exists())

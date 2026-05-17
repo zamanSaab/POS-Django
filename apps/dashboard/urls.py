@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    ConfigView,
     CustomerDetailView,
     CustomerListView,
     ReportsView,
@@ -13,4 +14,5 @@ urlpatterns = [
     path("customers/", CustomerListView.as_view(), name="dashboard-customers"),
     path("customers/<int:pk>/", CustomerDetailView.as_view(), name="dashboard-customer-detail"),
     path("reports/", ReportsView.as_view(), name="dashboard-reports"),
+    path("config/", ConfigView.as_view(), name="dashboard-config"),
 ]

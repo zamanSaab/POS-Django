@@ -9,7 +9,7 @@ POS_URL = "/api/pos/sales/"
 
 def make_staff():
     return User.objects.create_user(
-        email="staff@luxepos.com",
+        email="staff@frj-pos.com",
         name="Staff User",
         password="testpass",
         role="staff",

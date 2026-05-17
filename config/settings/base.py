@@ -123,8 +123,8 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "LUXE POS API",
-    "DESCRIPTION": "Backend API for the LUXE POS luxury ecommerce and point-of-sale system.",
+    "TITLE": "FRJ-POS API",
+    "DESCRIPTION": "Backend API for the FRJ-POS ecommerce and point-of-sale system.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,

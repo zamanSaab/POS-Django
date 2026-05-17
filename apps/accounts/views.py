@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from .emails import send_welcome_email
 from .models import NotificationPreferences, User
 from .serializers import (
     LoginSerializer,
@@ -36,6 +37,10 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        try:
+            send_welcome_email(user)
+        except Exception:
+            logger.exception("Failed to send welcome email to user_id=%s", user.pk)
         tokens = get_tokens_for_user(user)
         return Response(
             {"user": UserSerializer(user).data, **tokens},
@@ -101,7 +106,7 @@ class PasswordResetRequestView(APIView):
             reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
             try:
                 send_mail(
-                    subject="Reset your LUXE POS password",
+                    subject="Reset your FRJ-POS password",
                     message=(
                         f"Hi {user.name},\n\n"
                         f"Click the link below to reset your password. "

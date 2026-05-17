@@ -1,5 +1,5 @@
-// LUXE POS — Service Worker
-const CACHE_NAME = 'luxe-pos-v2';
+// FRJ-POS — Service Worker
+const CACHE_NAME = 'frj-pos-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
