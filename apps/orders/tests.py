@@ -4,7 +4,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
-from apps.orders.models import Order, SavedCart
+from apps.orders.models import Order, OrderTimeline, SavedCart
 from apps.store.models import Category, Product
 
 
@@ -219,6 +219,56 @@ class CheckoutCollisionRetryTest(TestCase):
             response = client.post(CHECKOUT_URL, VALID_PAYLOAD, format="json")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["order_number"], "ORD-BBBBBBBB")
+
+
+class OrderStatusUpdateTimelineTest(TestCase):
+    def setUp(self):
+        make_product(pid="p1", price="20.00")
+        self.admin = User.objects.create_user(
+            email="admin@example.com",
+            name="Admin User",
+            password="secret123",
+            phone="+92 300 4444444",
+            role="admin",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(CHECKOUT_URL, VALID_PAYLOAD, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.order = Order.objects.get(pk=response.json()["id"])
+
+    def test_status_update_reuses_existing_timeline_step(self):
+        initial_count = self.order.timeline.count()
+
+        response = self.client.patch(f"/api/orders/{self.order.id}/status/", {"status": "shipped"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "shipped")
+        self.assertEqual(self.order.timeline.count(), initial_count)
+        shipped = self.order.timeline.get(step="Shipped")
+        self.assertEqual(shipped.status, "current")
+        self.assertIsNotNone(shipped.time)
+
+        response = self.client.patch(f"/api/orders/{self.order.id}/status/", {"status": "shipped"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.order.timeline.filter(step="Shipped").count(), 1)
+        self.assertEqual(self.order.timeline.count(), initial_count)
+
+    def test_status_update_collapses_duplicate_timeline_steps(self):
+        OrderTimeline.objects.create(
+            order=self.order,
+            step="Shipped",
+            status="done",
+            time=self.order.created_at,
+            detail="Duplicate shipped entry.",
+        )
+
+        response = self.client.patch(f"/api/orders/{self.order.id}/status/", {"status": "shipped"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.order.timeline.filter(step="Shipped").count(), 1)
 
 
 class OrderConfirmationEmailTest(TestCase):

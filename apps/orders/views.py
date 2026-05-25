@@ -23,6 +23,7 @@ TIMELINE_STEPS = [
     ("Order Placed", "Your order has been confirmed."),
     ("Processing", "We are preparing your order."),
     ("Shipped", "Your order is on the way."),
+    ("Out for Delivery", "Your order is out for delivery."),
     ("Delivered", "Order delivered successfully."),
 ]
 
@@ -171,6 +172,59 @@ STATUS_STEP_MAP = {
     "cancelled": ("Cancelled", "Your order has been cancelled."),
 }
 
+STATUS_TIMELINE_ORDER = ["processing", "shipped", "out_for_delivery", "delivered"]
+
+
+def update_timeline_step(order, step, defaults):
+    timelines = list(order.timeline.filter(step=step).order_by("id"))
+    if not timelines:
+        OrderTimeline.objects.create(order=order, step=step, **defaults)
+        return
+
+    timeline = timelines[0]
+    for field, value in defaults.items():
+        setattr(timeline, field, value)
+    timeline.save(update_fields=[*defaults.keys()])
+    duplicate_ids = [item.id for item in timelines[1:]]
+    if duplicate_ids:
+        OrderTimeline.objects.filter(id__in=duplicate_ids).delete()
+
+
+def update_order_timeline(order, new_status):
+    now = timezone.now()
+
+    if new_status == "cancelled":
+        update_timeline_step(
+            order=order,
+            step="Cancelled",
+            defaults={
+                "status": "current",
+                "time": now,
+                "detail": STATUS_STEP_MAP["cancelled"][1],
+            },
+        )
+        order.timeline.exclude(step="Cancelled").filter(status="current").update(status="done")
+        return
+
+    current_index = STATUS_TIMELINE_ORDER.index(new_status)
+    for index, status_key in enumerate(STATUS_TIMELINE_ORDER):
+        step_label, detail = STATUS_STEP_MAP[status_key]
+        if index < current_index:
+            timeline_status = "done"
+        elif index == current_index:
+            timeline_status = "current" if new_status != "delivered" else "done"
+        else:
+            timeline_status = "pending"
+
+        defaults = {
+            "status": timeline_status,
+            "detail": detail,
+            "time": now if timeline_status in ("done", "current") else None,
+        }
+        update_timeline_step(order, step_label, defaults)
+
+    order.timeline.filter(step="Cancelled").delete()
+
 
 class OrderStatusUpdateView(APIView):
     permission_classes = [IsAdmin]
@@ -188,14 +242,7 @@ class OrderStatusUpdateView(APIView):
         order.status = new_status
         order.save()
 
-        step_label, detail = STATUS_STEP_MAP.get(new_status, (new_status.title(), ""))
-        OrderTimeline.objects.create(
-            order=order,
-            step=step_label,
-            status="done",
-            time=timezone.now(),
-            detail=detail,
-        )
+        update_order_timeline(order, new_status)
 
         if order.user:
             Notification.objects.create(

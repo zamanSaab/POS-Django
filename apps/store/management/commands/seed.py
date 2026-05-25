@@ -119,7 +119,7 @@ class Command(BaseCommand):
                 shipping_city="Lahore",
                 shipping_zip="54000",
             )
-            self.stdout.write("  Created customer user")
+            self.stdout.write("  Created primary customer user")
 
     def _seed_categories(self):
         from apps.store.models import Category
@@ -176,6 +176,26 @@ class Command(BaseCommand):
             {"customer_name": "Omar Farooq", "email": "omar@example.com", "phone": "+92 301 5550108", "status": "shipped", "payment_method": "wallet", "city": "Quetta", "zip": "87300"},
         ]
 
+        # Ensure every order customer has a real User account so they appear on the Customers page
+        order_users = {}
+        for od in sample_orders:
+            user_obj, _ = User.objects.get_or_create(
+                email=od["email"],
+                defaults={
+                    "name": od["customer_name"],
+                    "role": "customer",
+                    "phone": od["phone"],
+                    "shipping_city": od["city"],
+                    "shipping_zip": od["zip"],
+                },
+            )
+            if not user_obj.has_usable_password():
+                user_obj.set_password("customer123")
+                user_obj.save(update_fields=["password"])
+            order_users[od["email"]] = user_obj
+
+        self.stdout.write(f"  Ensured {len(order_users)} customer user accounts")
+
         for i, od in enumerate(sample_orders):
             if Order.objects.filter(customer_name=od["customer_name"], email=od["email"]).exists():
                 continue
@@ -188,7 +208,7 @@ class Command(BaseCommand):
             total = subtotal + tax + delivery_fee
 
             order = Order.objects.create(
-                user=customer if i == 0 else None,
+                user=order_users[od["email"]],
                 customer_name=od["customer_name"],
                 email=od["email"],
                 phone=od["phone"],
