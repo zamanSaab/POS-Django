@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from django.db.models import Sum, Count, Avg, Q, F
 from django.db.models.functions import TruncDate
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -301,10 +302,21 @@ class ConfigView(APIView):
     def patch(self, request):
         self.permission_classes = [IsAdmin]
         self.check_permissions(request)
-        updated = {}
-        for key, value in request.data.items():
-            rows = Configuration.objects.filter(key=key)
-            if rows.exists():
-                rows.update(value=str(value))
-                updated[key] = str(value)
-        return Response(updated)
+        updated = {
+            key: str(value)
+            for key, value in request.data.items()
+            if Configuration.objects.filter(key=key).exists()
+        }
+        active_store_type = updated.get(Configuration.ACTIVE_STORE_TYPE_KEY)
+        valid_store_types = {value for value, _ in Configuration.STORE_TYPE_CHOICES}
+        if active_store_type and active_store_type not in valid_store_types:
+            return Response(
+                {Configuration.ACTIVE_STORE_TYPE_KEY: "Select accessories, clothing, or jewelry."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        saved = {}
+        for key, value in updated.items():
+            Configuration.objects.filter(key=key).update(value=value)
+            saved[key] = value
+        return Response(saved)
